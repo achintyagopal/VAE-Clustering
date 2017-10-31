@@ -75,7 +75,7 @@ class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
 
-        self.z_size = 5
+        self.z_size = 20
 
         self.fc1 = nn.Linear(784, 400)
         self.fc21 = nn.Linear(400, self.z_size)
@@ -137,7 +137,7 @@ def loss_function(recon_xs, x, mu, logvar, y_class, epoch):
     mu2 = Variable(y_class.matmul(mu_clusters))
     sigma2 = Variable(y_class.matmul(sigma_clusters))
     KLD_element = mu.sub(mu2).pow(2).div(sigma2)
-    KLD_element = KLD_element.add_(logvar.exp().div(sigma2)).mul_(-1).add_(logvar).sub_(sigma2.log()) / (2*model.z_size)
+    KLD_element = KLD_element.add_(logvar.exp().div(sigma2)).mul_(-1).add_(logvar).sub_(sigma2.log()) * max(epoch, (2.*model.z_size)) / (2.*model.z_size)
 
     # KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     KLD = torch.sum(KLD_element).mul_(-0.5)
@@ -214,6 +214,23 @@ def test(epoch):
     test_loss = 0
     correct = 0
     total = 0
+
+    imgs = []
+    for i in range(10):
+        mu_cluster = mu_clusters[i]
+        sigma_cluster = sigma_clusters[i]
+
+        model.eval()
+        x = model.decode(z)
+
+        imgFile = np.resize((x.data).cpu().numpy(), (28,28))
+        imgs.append(imgFile)
+
+    imgFile = stack(imgs)
+    imgFile = imgFile * 255 / np.max(imgFile)
+    imgFileName = args.save_image + "_" + str(epoch) + ".png"
+    cv.imwrite(imgFileName, imgFile)
+
     for batch_idx, (data_t, z_class) in enumerate(test_loader):
         y_class = np.eye(10)[z_class.numpy()]
 
@@ -286,6 +303,19 @@ def initialize():
         # mu[i][0] = i
         sigma.append([1] * model.z_size)
     return torch.from_numpy(np.array(mu)).type(torch.FloatTensor), torch.from_numpy(np.array(sigma)).type(torch.FloatTensor)
+
+def stack(ra):
+    num_per_row = int(np.sqrt(len(ra)))
+    rows = [np.concatenate(tuple(ra[i* num_per_row : i*num_per_row + num_per_row]), axis=1) 
+            for i in range(num_per_row)]
+    img = np.concatenate(tuple(rows), axis=0)
+    return img
+
+# zs = []
+# for _ in range(args.sample_size ** 2):
+#     z = torch.FloatTensor(1,model.z_size).normal_()
+#     z = Variable(z)
+#     zs.append(z)
 
 if args.load_model:
     model = torch.load(args.load_model)

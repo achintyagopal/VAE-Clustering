@@ -29,7 +29,7 @@ parser.add_argument('--sample-size', type=int, default=10, metavar='N',
                     help='number of samples to generate (should be perfect square)')
 parser.add_argument('--eval-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--save-interval', type=int, default=100000, metavar='N',
+parser.add_argument('--save-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument("--load-model", type=str,
         help="The file containing already trained model.")
@@ -77,7 +77,7 @@ class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
 
-        self.z_size = 5
+        self.z_size = 20
         self.cat_size = 10
 
         self.fc1 = nn.Linear(784, 400)
@@ -148,8 +148,6 @@ model = VAE()
 
 reconstruction_function = nn.MSELoss()
 reconstruction_function.size_average = False
-kl_loss = nn.KLDivLoss()
-kl_loss.size_average = False
 mu_clusters = []
 sigma_clusters = []
 theta_clusters = []
@@ -157,8 +155,9 @@ theta_clusters = []
 def loss_function(recon_xs, x, mu, logvar, y_class, categorical, epoch):
     BCE = 0
     for recon_x in recon_xs:
+        # BCE += reconstruction_function(recon_x, x) * max(math.sqrt(model.z_size / float(epoch ** 2)), 1.)
         BCE += reconstruction_function(recon_x, x) * math.sqrt(model.z_size)
-    BCE /= len(recon_xs)
+    # BCE /= len(recon_xs)
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -168,24 +167,39 @@ def loss_function(recon_xs, x, mu, logvar, y_class, categorical, epoch):
     y_class = torch.from_numpy(y_class).type(torch.FloatTensor)
     mu2 = Variable(y_class.matmul(mu_clusters))
     sigma2 = Variable(y_class.matmul(sigma_clusters))
-    KLD_element = mu.sub(mu2).pow(2).div(sigma2)
-    KLD_element = KLD_element.add_(logvar.exp().div(sigma2)).mul_(-1).add_(logvar).sub_(sigma2.log()) / (2*model.z_size)
-    KLD = torch.sum(KLD_element).mul_(-0.5) *(model.z_size)
-
-    # c = F.softmax(categorical)
     theta2 = Variable(y_class.matmul(theta_clusters))
-    kl_loss = nn.KLDivLoss()
-    KLD += kl_loss(categorical, theta2)
+
+    KLD_element = mu.sub(mu2).pow(2).div(sigma2)
+    # print(logvar)
+    # print(torch.sum(theta2.mul(theta2.log()),dim=1).view((args.batch_size,-1)).expand_as(logvar))
+    KLD_element = KLD_element.add_(logvar.exp().div(sigma2)).mul_(-1).add_(1).add_(logvar).mul((-torch.sum(theta2.mul(theta2.log()),dim=1).view((logvar.size()[0],-1)).expand_as(logvar))) #.sub_(sigma2.log()) #/ (2*model.z_size)
+    KLD = torch.sum(KLD_element).mul_(-0.5) * model.z_size/2.
+    # KLD *= torch.sum(theta2.mul(theta2.log()),dim=1)
+
+    # print(KLD)
+    # KLD_element2 = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
+    # KLD2 = torch.sum(KLD_element2).mul_(-0.5) * model.z_size
+    # print(KLD2)
+
+    c = F.softmax(categorical)
+    
+    # KLD += kl_loss(categorical, theta2)
+    KLD += torch.sum(c.mul(c.add(1e-9).log() - (theta2.add(1e-9)).log()))
+    # KLD += kl_loss(theta2, categorical)
+
+
+
     # do something here
 
     return BCE + KLD
 
 
-optimizer = optim.Adam(model.parameters(), lr=1e-2)
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 def train(epoch):
     # update_clusters(epoch)
-    for _ in range(1):
+    for _ in range(2):
+        print('train vae')
         train_vae(epoch)
     # return initialize()
     return update_clusters(epoch)
@@ -195,7 +209,7 @@ def update_clusters(epoch):
     mu_tot = []
     sigma_tot = []
     theta_tot = []
-    theta_sum = 0
+    theta_sum = [0] * (model.cat_size)
     for data, z_class in train_loader2:
         y_class = np.eye(10)[z_class.numpy()]
         data = Variable(data)
@@ -214,15 +228,17 @@ def update_clusters(epoch):
             mu = np.sum(mu_data_2, axis=0) / len(y_class)
             sigma = np.sum(sigma_data_2, axis=0) / len(y_class)
             theta = np.sum(theta_data_2, axis=0) / len(y_class)
-            theta_sum += theta
+            # print((theta))
+            # theta_sum += theta
+            theta_sum[c] = np.sum(theta)
             sigma = sigma + np.sum(np.square(mu_data - mu), axis=0) / len(y_class)
             mu_tot.append(mu)
             sigma_tot.append(sigma)
             theta_tot.append(theta)
         break
     for c in range(10):
-        theta_tot[c] /= theta_sum
-
+        # theta_tot[c] /= theta_sum
+        theta_tot[c] /= theta_sum[c]
     # this part basically says don't update sigma, 
     # _, sigma_tot, _ = initialize()
 
@@ -265,6 +281,21 @@ def test(epoch):
     test_loss = 0
     correct = 0
     total = 0
+
+    imgs = []
+    for z in zs: 
+        for c in cs:
+            model.eval()
+            x = model.decode(z, c)
+
+            imgFile = np.resize((x.data).cpu().numpy(), (28,28))
+            imgs.append(imgFile)
+
+    imgFile = stack(imgs)
+    imgFile = imgFile * 255 / np.max(imgFile)
+    imgFileName = args.save_image + "_" + str(epoch) + ".png"
+    cv.imwrite(imgFileName, imgFile)
+
     for batch_idx, (data_t, z_class) in enumerate(test_loader):
         y_class = np.eye(10)[z_class.numpy()]
 
@@ -288,9 +319,12 @@ def test(epoch):
                 theta2 = theta_clusters[j]
 
                 distance = gaussian_kl_divergence(mu1, logvar1, mu2, sigma2)
-                print(distance)
-                print(categorical_kl_divergence(theta1, theta2).data.numpy()[0])
-                distance += categorical_kl_divergence(theta1, theta2).data.numpy()[0]
+                cat_distance = categorical_kl_divergence(theta1, theta2).data.numpy()[0] * 300
+                # print(j, distance, cat_distance)
+                distance += cat_distance
+                # print(theta1, theta2, categorical_kl_divergence(theta1, theta2).data.numpy()[0])
+                # distance += categorical_kl_divergence(theta2, theta1).data.numpy()[0] * model.z_size
+
                 # print(distance)
                 # distance = normal_pdf(mu1, mu2, sigma2)
                 if j == 0 or distance < min_distance:
@@ -318,7 +352,7 @@ def gaussian_kl_divergence(mu1, logsigma1, mu2, sigma2):
 
     mu2 = mu2.numpy()
     sigma2 = sigma2.numpy()
-    return 0.5*np.sum(np.square(mu2 - mu1) / sigma2 + np.exp(logsigma1) / sigma2 + np.log(sigma2) - logsigma1)
+    return 0.5*np.sum(np.square(mu2 - mu1) / sigma2 + np.exp(logsigma1) / sigma2 + np.log(sigma2) - logsigma1 - model.z_size)
 
 def convert_list(a):
     return torch.from_numpy(np.array(a)).type(torch.FloatTensor)
@@ -343,11 +377,33 @@ if args.load_model:
 else:
     mu_clusters, sigma_clusters, theta_clusters = initialize()
 
+def stack(ra):
+    num_per_row = int(np.sqrt(len(ra)))
+    rows = [np.concatenate(tuple(ra[i* num_per_row : i*num_per_row + num_per_row]), axis=1) 
+            for i in range(num_per_row)]
+    img = np.concatenate(tuple(rows), axis=0)
+    return img
+
+zs = []
+for _ in range(args.sample_size):
+    z = torch.FloatTensor(1,model.z_size).normal_()
+    z = Variable(z)
+    zs.append(z)
+
+cs = []
+for i in range(10):
+    c = np.zeros((1,10))
+    c[0][i] = 1
+    c = torch.from_numpy(c).type(torch.FloatTensor)
+    c = Variable(c)
+    cs.append(c)
+
 for epoch in range(1, args.epochs + 1):
     # if "eval" in args.mode:
-        # test(epoch)
+    # test(epoch)
     if "train" in args.mode:
         mu_clusters, sigma_clusters, theta_clusters = train(epoch)
+        print(theta_clusters)
     if "eval" in args.mode and epoch % 1 == 0:
         test(epoch)
 

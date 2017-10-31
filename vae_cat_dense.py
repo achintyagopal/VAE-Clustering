@@ -29,9 +29,9 @@ parser.add_argument('--save-interval', type=int, default=100000, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument("--load-model", type=str,
         help="The file containing already trained model.")
-parser.add_argument("--save-model", default="catvae", type=str,
+parser.add_argument("--save-model", default="cvae", type=str,
         help="The file containing already trained model.")
-parser.add_argument("--save-image", default="catvae5b", type=str,
+parser.add_argument("--save-image", default="cvae", type=str,
         help="The file containing already trained model.")
 parser.add_argument("--temperature", default=1, type=float,
         help="The file containing already trained model.")
@@ -165,6 +165,7 @@ def loss_function(recon_xs, x, mu, logvar, categorical):
     c = F.softmax(categorical)
     # KLD += torch.sum(c.mul(c.mul(model.cat_size).add_(1e-9).log()))
     KLD += torch.sum(c.mul(c.mul(model.cat_size).add_(1e-9).log())) # args.sigma
+    # KLD += torch.sum(c.mul(c.add(1e-9).log() + Variable(model.cat_size).log())) # args.sigma
     return BCE + KLD
 
 
