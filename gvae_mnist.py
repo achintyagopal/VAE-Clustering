@@ -99,7 +99,6 @@ class VAE(nn.Module):
         std = logvar.mul(0.5).exp_()
         eps = torch.FloatTensor(std.size()).normal_()
         eps = Variable(eps)
-        eps = eps.mul(std)
         return eps.mul(std).add_(mu)
 
     def decode(self, z):
@@ -137,7 +136,7 @@ def loss_function(recon_xs, x, mu, logvar, y_class, epoch):
     mu2 = Variable(y_class.matmul(mu_clusters))
     sigma2 = Variable(y_class.matmul(sigma_clusters))
     KLD_element = mu.sub(mu2).pow(2).div(sigma2)
-    KLD_element = KLD_element.add_(logvar.exp().div(sigma2)).mul_(-1).add_(logvar).sub_(sigma2.log()) * max(epoch, (2.*model.z_size)) / (2.*model.z_size)
+    KLD_element = KLD_element.add_(logvar.exp().div(sigma2)).mul_(-1).add_(logvar).sub_(sigma2.log()) * min(epoch, (2.*model.z_size)) / (2.*model.z_size)
 
     # KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     KLD = torch.sum(KLD_element).mul_(-0.5)
@@ -216,10 +215,7 @@ def test(epoch):
     total = 0
 
     imgs = []
-    for i in range(10):
-        mu_cluster = mu_clusters[i]
-        sigma_cluster = sigma_clusters[i]
-
+    for z in zs:
         model.eval()
         x = model.decode(z)
 
@@ -311,11 +307,11 @@ def stack(ra):
     img = np.concatenate(tuple(rows), axis=0)
     return img
 
-# zs = []
-# for _ in range(args.sample_size ** 2):
-#     z = torch.FloatTensor(1,model.z_size).normal_()
-#     z = Variable(z)
-#     zs.append(z)
+zs = []
+for _ in range(args.sample_size ** 2):
+    z = torch.FloatTensor(1,model.z_size).normal_()
+    z = Variable(z)
+    zs.append(z)
 
 if args.load_model:
     model = torch.load(args.load_model)
@@ -327,7 +323,7 @@ else:
 
 for epoch in range(1, args.epochs + 1):
     # if "eval" in args.mode and epoch % 1 == 0:
-        # test(epoch)
+    # test(epoch)
     if "train" in args.mode:
         mu_clusters, sigma_clusters = train(epoch)
     if "eval" in args.mode and epoch % 1 == 0:
