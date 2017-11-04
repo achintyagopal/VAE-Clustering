@@ -1,0 +1,57 @@
+cifar10_dense
+    Train a neural network with convolutional layers on Cifar10
+    Accuracy: 46.23%, 49.84%, 48.33% (1e-2)
+    Accuracy: 52.77% after 10 iterations (1e-3)
+
+mxnet_cifar10_cnn
+    MXNet implementation of above, runs each epoch twice as fast (from 2 minutes to 1 minute)
+
+cvae_cnn_cifar10
+    Train a conditional VAE with convolutional layers on Cifar10
+    The goal is to use the autoencoder aspect of VAE to improve training. Basically, the interpretation I have is that the autoencoder forces the model to learn a more global descriptor of the images, and the variational aspect regularizes the model and maybe makes the model more continuous.
+    Accuracy: 60% by 7th iteration
+
+mxnet_cvae_cnn_cifar10
+    MXNet version of above, one epoch takes 6 minutes versus 4 minutes in Pytorch (so it's slower)
+
+gvae_cat_mnist
+    Try to classify MNIST using a VAE which contains Gaussians and Categorical encodings
+    Wasn't able to get better than 55% accuracy
+    There are many different hyperparameters to tweak
+    I would guess if a good set of hyperparameters are chosen, the results will be better than gvae_mnist
+
+gvae_mnist
+    Try to classify MNIST using a VAE which only has a Gaussian
+    Was able to get 80% accuracy after 10 epochs (clearly not as good as using a regular model which approaches 95% after 10 epochs)
+
+infovae/ vae_cat_dense / vae_cat_dense_2
+    Implementation of VAEs with Gumbel Softmax distribution for categorical features
+    By having the reconstruction term and normal distribution term weigh more heavily than the categorical term, the results causes the model to learn the different numbers per category. This has to do with not forcing the distribution of categorical to be uniform
+
+mnist_cnn
+    Classify MNIST dataset using a Convolutional Network
+
+mnist_dense
+    Classify MNIST dataset using only Dense Layers
+
+utils
+    Contains OpenCV utilities (read and writing images)
+
+vae_cnn_cifar10
+    Use VAE on Cifar10
+
+vae_cnn_mnist
+    Use VAE for classification of MNIST (similar to cvae_cnn_cifar10)
+
+vae_dense
+    Use VAE on MNIST
+
+vae_dense_mnist
+    Add Variational Autoencoder to see if training a NN on MNIST improves.
+
+vae_vgg
+    Doesn't work
+    Tried to use VGG16 model for features and then use those features as a part of the loss function similar to style transfer. Basically, it would be a way to improve on the L2 loss which causes blurry images to a loss function that is dependent on the features of the image
+
+vgg
+    Object that loads in the VGG16 model
