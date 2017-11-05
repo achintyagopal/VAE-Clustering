@@ -26,7 +26,8 @@ gvae_mnist
 
 infovae/ vae_cat_dense / vae_cat_dense_2
     Implementation of VAEs with Gumbel Softmax distribution for categorical features
-    By having the reconstruction term and normal distribution term weigh more heavily than the categorical term, the results causes the model to learn the different numbers per category. This has to do with not forcing the distribution of categorical to be uniform
+    By having the reconstruction term and normal distribution term weigh more heavily than the categorical term, the results causes the model to learn the different numbers per category. This has to do with not forcing the distribution of categorical to be uniform.
+    The mathematical backing of this is that it's being trained to be close to a uniform distribution. If we add a Dirichlet prior with a small alpha, the probability of the uniform distribution will be low causing the term to be scaled down (or the other terms scaled up).
 
 mnist_cnn
     Classify MNIST dataset using a Convolutional Network

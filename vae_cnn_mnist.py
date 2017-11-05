@@ -74,7 +74,7 @@ class VAE(nn.Module):
             nn.Conv2d(1, 64, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. 64 x 14 x 14
-            nn.Conv2d(ndf, 128, 4, 2, 1, bias=False),
+            nn.Conv2d(64, 128, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             nn.BatchNorm2d(128)
         )
@@ -122,6 +122,7 @@ class VAE(nn.Module):
         return self.z_size + self.cat_size
 
     def encode(self, x):
+        print(self.seq(x).size())
         h1 = self.relu(self.fc1(x))
         return self.fc21(h1), self.fc22(h1), self.fc23(h1)
 
@@ -167,7 +168,7 @@ class VAE(nn.Module):
         return self.decode(z, c), mu, logvar, categorical
 
     def forward(self, x):
-        mu, logvar, categorical = self.encode(x.view(-1, 784))
+        mu, logvar, categorical = self.encode(x)
         return self.sampleAndDecode(mu, logvar, categorical)
 
 model = VAE()
